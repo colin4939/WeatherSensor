@@ -3,18 +3,20 @@
 #include <Wire.h>
 #include <RH_ASK.h>
 
-RH_ASK rf_driver(2000, -1, 7, 5); //(Speed, RX, TX, PTT)
+// RH_ASK(speed, rxPin, txPin, pttPin)
+RH_ASK rf_driver(2000, -1, 7, 5);
 ForcedBME280Float climateSensor = ForcedBME280Float();
 
-float g_temperatureFloat;    // raw temperature
-float g_pressureFloat;       // raw pressure
-float g_humidityFloat;       // raw humidity
+int16_t g_temperatureFloat;    // raw temperature
+int16_t g_pressureFloat;       // raw pressure
+int16_t g_humidityFloat;       // raw humidity
+int16_t currentTempF;
+int16_t currentTempC;
+int16_t currentPre;
+int16_t currentHum;
+char buf[16];
 
-float currentTempF;
-float currentTempC;
-float currentPre;
-float currentHum;
-
+// Display
 #define BMD31M090_WIDTH   128        // BMD31M090 Module display width, in pixels
 #define BMD31M090_HEIGHT  64         // BMD31M090 Module display height, in pixels
 BMD31M090 BMD31(BMD31M090_WIDTH, BMD31M090_HEIGHT, &Wire);
@@ -66,11 +68,17 @@ void loop() {
   Serial.print(currentPre);
   Serial.println(" inHg");
 
-  BMD31.setFont(FontTable_6X8);
-  BMD31.drawNum(32, displayROW3, currentTempC, 5);
-  BMD31.drawNum(85, displayROW3, currentTempF, 5);
-  BMD31.drawNum(32, displayROW5, g_humidityFloat, 5);
-  BMD31.drawNum(32, displayROW7, currentPre, 5);
+  dtostrf(currentTempC, 0, 2, buf);
+  BMD31.drawString(32, displayROW3, (u8*)buf);
+
+  dtostrf(currentTempF, 0, 2, buf);
+  BMD31.drawString(85, displayROW3, (u8*)buf);
+
+  dtostrf(currentHum, 0, 2, buf);
+  BMD31.drawString(32, displayROW5, (u8*)buf);
+
+  dtostrf(currentPre, 0, 2, buf);
+  BMD31.drawString(32, displayROW7, (u8*)buf);
 
   float SendPackage[3] = {g_temperatureFloat, g_humidityFloat, g_pressureFloat};
   rf_driver.send((uint8_t*)SendPackage, sizeof(SendPackage));
