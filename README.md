@@ -1,14 +1,19 @@
 # WeatherSensor
 Remote weather sensor project
+with 433MHz transmitter and receiver
 
-Arduino Nano
-BME280 5V I2C Temeperature Humidity Sensor with Atmospheric Barometric Pressure
-433mhz Wireless RF Transmitter
+Material Needed:
+Arduino Nano x2
+Breadboard - 400 contacts x2
+BME280 5V I2C Temeperature Humidity and Baro sensor
+433MHz transmitter module
+433MHz receiver module
 
-Require Library
+
+Require Library:
 RadioHead
 forcedBMX280
 BMD31M090
 
 
-![alt text](image.png)
+![alt text](remoteSide.png)
