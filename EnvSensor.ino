@@ -1,88 +1,84 @@
+#include <Wire.h>
 #include <BMD31M090.h>
 #include <forcedBMX280.h>
-#include <Wire.h>
-#include <RH_ASK.h>
 
-// RH_ASK(speed, rxPin, txPin, pttPin)
-RH_ASK rf_driver(2000, -1, 7, 5);
-ForcedBME280Float climateSensor = ForcedBME280Float();
-
-int16_t g_temperatureFloat;    // raw temperature
-int16_t g_pressureFloat;       // raw pressure
-int16_t g_humidityFloat;       // raw humidity
-int16_t currentTempF;
-int16_t currentTempC;
-int16_t currentPre;
-int16_t currentHum;
-char buf[16];
+ForcedBME280Float climateSensor;
 
 // Display
-#define BMD31M090_WIDTH   128        // BMD31M090 Module display width, in pixels
-#define BMD31M090_HEIGHT  64         // BMD31M090 Module display height, in pixels
-BMD31M090 BMD31(BMD31M090_WIDTH, BMD31M090_HEIGHT, &Wire);
+BMD31M090 BMD31(128, 64, &Wire);
+
+static char buf[12];   // small shared buffer
+
+// Format value scaled by 100 (xx.yy)
+static void fmt_x100(int32_t v_x100) {
+  bool neg = (v_x100 < 0);
+  if (neg) v_x100 = -v_x100;
+
+  int32_t whole = v_x100 / 100;
+  int32_t frac  = v_x100 % 100;
+
+  char *p = buf;
+  if (neg) *p++ = '-';
+
+  // convert whole part
+  char tmp[8];
+  uint8_t i = 0;
+  do {
+    tmp[i++] = '0' + (whole % 10);
+    whole /= 10;
+  } while (whole && i < sizeof(tmp));
+
+  while (i--) *p++ = tmp[i];
+
+  *p++ = '.';
+  *p++ = '0' + (frac / 10);
+  *p++ = '0' + (frac % 10);
+  *p = '\0';
+}
+
+static void draw_x100(uint8_t x, uint8_t y, int32_t v_x100) {
+  fmt_x100(v_x100);
+  BMD31.drawString(x, y, (u8*)buf);
+}
 
 void setup() {
-  Serial.begin(9600);
   Wire.begin();
   climateSensor.begin();
   BMD31.begin(0x3C);
-  rf_driver.init();
 
   BMD31.setFont(FontTable_6X8);
-  BMD31.drawString(0, displayROW3, (u8*)"Temp:");
+
+  // Static labels (draw once)
+  BMD31.drawString(0,  displayROW1, (u8*)"Env Sensor");
+  BMD31.drawString(0,  displayROW3, (u8*)"Temp:");
   BMD31.drawString(65, displayROW3, (u8*)"C");
-  BMD31.drawString(75, displayROW3, (u8*)"/");
-  BMD31.drawString(120, displayROW3, (u8*)"F");
-  BMD31.drawString(0, displayROW5, (u8*)"RH%:");
+  BMD31.drawString(0,  displayROW5, (u8*)"RH%:");
   BMD31.drawString(65, displayROW5, (u8*)"%");
-  BMD31.drawString(0, displayROW7, (u8*)"BRO:");
+  BMD31.drawString(0,  displayROW7, (u8*)"BRO:");
   BMD31.drawString(65, displayROW7, (u8*)"inHg");
-  delay(100); //Recommended initial setting delay value.
+
+  delay(100);
 }
 
 void loop() {
-  //Get pressure value
   delay(1000);
   climateSensor.takeForcedMeasurement();
 
-  g_temperatureFloat = climateSensor.getTemperatureCelsius();
-  currentTempF = g_temperatureFloat/100*1.8+32;
-  currentTempC = (currentTempF - 32)*5.0/9.0;
-  Serial.println(" ");
-  Serial.print("Temperature: ");
-  Serial.print(currentTempC);
-  Serial.print("°C");
-  Serial.print("/");
-  Serial.print(currentTempF);
-  Serial.println("°F");
-  
-  g_humidityFloat = climateSensor.getRelativeHumidityAsFloat();
-  currentHum = g_humidityFloat;
-  Serial.print("Humidity: ");
-  Serial.print(currentHum);
-  Serial.println(" %");
+  // Temperature (assumed already scaled x100 by library)
+  int32_t tempC_x100 = (int32_t)climateSensor.getTemperatureCelsius();
 
-  g_pressureFloat = climateSensor.getPressureAsFloat();
-  currentPre = g_pressureFloat*0.02952998;
-  Serial.print("Pressure: ");
-  Serial.print(currentPre);
-  Serial.println(" inHg");
+  // Humidity (% x100)
+  float hum_f = climateSensor.getRelativeHumidityAsFloat();
+  int32_t hum_x100 = (int32_t)(hum_f * 100.0f + 0.5f);
 
-  dtostrf(currentTempC, 0, 2, buf);
-  BMD31.drawString(32, displayROW3, (u8*)buf);
+  // Pressure -> inHg x100
+  // If pressure is in hPa:
+  float pres_f = climateSensor.getPressureAsFloat();
+  int32_t presInHg_x100 = (int32_t)(pres_f * 2.952998f + 0.5f);
 
-  dtostrf(currentTempF, 0, 2, buf);
-  BMD31.drawString(85, displayROW3, (u8*)buf);
-
-  dtostrf(currentHum, 0, 2, buf);
-  BMD31.drawString(32, displayROW5, (u8*)buf);
-
-  dtostrf(currentPre, 0, 2, buf);
-  BMD31.drawString(32, displayROW7, (u8*)buf);
-
-  float SendPackage[3] = {g_temperatureFloat, g_humidityFloat, g_pressureFloat};
-  rf_driver.send((uint8_t*)SendPackage, sizeof(SendPackage));
-  rf_driver.waitPacketSent();
+  draw_x100(32, displayROW3, tempC_x100);
+  draw_x100(32, displayROW5, hum_x100);
+  draw_x100(32, displayROW7, presInHg_x100);
 
   delay(2000);
 }
