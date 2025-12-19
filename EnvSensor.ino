@@ -10,7 +10,8 @@ RH_ASK rf_driver(2000, 0, 7, 255, false); // 2000 bps, RX unused, TX pin 7
 // Display
 BMD31M090 BMD31(128, 64, &Wire);
 
-static char buf[12];
+static char buf[12];   // small shared buffer
+
 
 // ---------- 433MHz payload ----------
 struct __attribute__((packed)) SensorPayload {
@@ -24,8 +25,9 @@ struct __attribute__((packed)) SensorPayload {
 
 static SensorPayload tx;
 static uint16_t txCounter = 0;
-// -----------------------------------
 
+
+// Format value scaled by 100 (xx.yy)
 static void fmt_x100(int32_t v_x100) {
   bool neg = (v_x100 < 0);
   if (neg) v_x100 = -v_x100;
@@ -36,6 +38,7 @@ static void fmt_x100(int32_t v_x100) {
   char *p = buf;
   if (neg) *p++ = '-';
 
+  // convert whole part
   char tmp[8];
   uint8_t i = 0;
   do {
@@ -60,7 +63,6 @@ void setup() {
   Wire.begin();
   climateSensor.begin();
   BMD31.begin(0x3C);
-
   rf_driver.init(); // returns bool in some versions; ignoring here for brevity
 
   BMD31.setFont(FontTable_6X8);
@@ -69,7 +71,6 @@ void setup() {
   BMD31.drawString(0,  displayROW1, (u8*)"Env Sensor");
   BMD31.drawString(0,  displayROW3, (u8*)"Temp:");
   BMD31.drawString(65, displayROW3, (u8*)"C");
-  BMD31.drawString(115, displayROW3, (u8*)"F");
   BMD31.drawString(0,  displayROW5, (u8*)"RH%:");
   BMD31.drawString(65, displayROW5, (u8*)"%");
   BMD31.drawString(0,  displayROW7, (u8*)"BRO:");
@@ -82,17 +83,15 @@ void loop() {
   delay(1000);
   climateSensor.takeForcedMeasurement();
 
-  // --- Read & scale sensor values ---
-  // Temperature in °C (float) -> x100
-  float tC = climateSensor.getTemperatureCelsius();
-  int32_t tempC_x100 = (int32_t)(tC * 100.0f + (tC >= 0 ? 0.5f : -0.5f));
+  // Temperature (assumed already scaled x100 by library)
+  int32_t tempC_x100 = (int32_t)climateSensor.getTemperatureCelsius();
+
+  // Humidity (% x100)
+  float hum_f = climateSensor.getRelativeHumidityAsFloat();
+  int32_t hum_x100 = (int32_t)(hum_f * 100.0f + 0.5f);
 
   // Celsius x100 -> Fahrenheit x100
   int32_t tempF_x100 = (tempC_x100 * 9) / 5 + 3200;
-
-  // Humidity (%RH float) -> x100
-  float hum_f = climateSensor.getRelativeHumidityAsFloat();
-  int32_t hum_x100 = (int32_t)(hum_f * 100.0f + 0.5f);
 
   // Pressure: confirm what your library returns!
   // If it returns hPa, inHg = hPa * 0.02952998
@@ -100,9 +99,8 @@ void loop() {
   float pres_hPa = climateSensor.getPressureAsFloat();
   int32_t inHg_x100 = (int32_t)(pres_hPa * 2.952998f + 0.5f);
 
-  // --- Update display ---
-  draw_x100(32, displayROW3, tempC_x100/100);
-  draw_x100(82, displayROW3, tempF_x100/100);
+  draw_x100(32, displayROW3, tempC_x100);
+  draw_x100(82, displayROW3, tempF_x100);
   draw_x100(32, displayROW5, hum_x100);
   draw_x100(32, displayROW7, inHg_x100);
 
