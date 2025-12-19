@@ -71,6 +71,7 @@ void setup() {
   BMD31.drawString(0,  displayROW1, (u8*)"Env Sensor");
   BMD31.drawString(0,  displayROW3, (u8*)"Temp:");
   BMD31.drawString(65, displayROW3, (u8*)"C");
+  BMD31.drawString(115, displayROW3, (u8*)"F");
   BMD31.drawString(0,  displayROW5, (u8*)"RH%:");
   BMD31.drawString(65, displayROW5, (u8*)"%");
   BMD31.drawString(0,  displayROW7, (u8*)"BRO:");
