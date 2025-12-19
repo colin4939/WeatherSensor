@@ -10,8 +10,8 @@ RH_ASK rf_driver(2000, 0, 7, 255, false); // 2000 bps, RX unused, TX pin 7
 // Display
 BMD31M090 BMD31(128, 64, &Wire);
 
-static char buf[12];   // small shared buffer
-
+// small shared buffer
+static char buf[12];   
 
 // ---------- 433MHz payload ----------
 struct __attribute__((packed)) SensorPayload {
